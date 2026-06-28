@@ -1,0 +1,1086 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BTC 实时成交流</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b0d0c;
+      --panel: #141816;
+      --panel-2: #101412;
+      --line: #27302c;
+      --text: #eef5ef;
+      --muted: #96a39b;
+      --green: #22c984;
+      --red: #f05d5e;
+      --amber: #f1b84b;
+      --cyan: #49c7d9;
+      --shadow: rgba(0, 0, 0, 0.35);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        linear-gradient(180deg, rgba(34, 201, 132, 0.06), transparent 330px),
+        radial-gradient(circle at top right, rgba(73, 199, 217, 0.10), transparent 360px),
+        var(--bg);
+      color: var(--text);
+      overflow-x: hidden;
+    }
+
+    button,
+    select {
+      font: inherit;
+    }
+
+    .shell {
+      width: min(1500px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 20px 0 28px;
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 16px;
+      align-items: center;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .coin {
+      width: 46px;
+      height: 46px;
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+      border: 1px solid rgba(241, 184, 75, 0.45);
+      background: linear-gradient(145deg, #f5bf58, #b56e13);
+      border-radius: 50%;
+      color: #171108;
+      font-size: 25px;
+      font-weight: 800;
+      box-shadow: 0 12px 32px rgba(241, 184, 75, 0.16);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(24px, 3vw, 42px);
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .control {
+      height: 38px;
+      color: var(--text);
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0 12px;
+      outline: none;
+    }
+
+    .icon-button {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--text);
+      cursor: pointer;
+      transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+    }
+
+    .icon-button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(73, 199, 217, 0.65);
+      background: #19201d;
+    }
+
+    .icon-button svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(420px, 0.95fr);
+      gap: 18px;
+      padding-top: 18px;
+      align-items: stretch;
+      height: calc(100vh - 130px);
+      min-height: 560px;
+      max-height: 760px;
+    }
+
+    .market-panel,
+    .feed-panel {
+      min-width: 0;
+      border: 1px solid var(--line);
+      background: color-mix(in srgb, var(--panel) 94%, transparent);
+      border-radius: 8px;
+      box-shadow: 0 18px 55px var(--shadow);
+    }
+
+    .market-panel {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      overflow: hidden;
+    }
+
+    .headline {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 14px;
+      padding: 16px 18px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .price-label,
+    .panel-label,
+    .metric-label {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .price-row {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 7px;
+    }
+
+    .price {
+      font-variant-numeric: tabular-nums;
+      font-size: clamp(34px, 4.2vw, 58px);
+      line-height: 0.95;
+      letter-spacing: 0;
+      white-space: nowrap;
+      transition: color 140ms ease, text-shadow 140ms ease, transform 140ms ease;
+    }
+
+    .price.flash-up {
+      color: var(--green);
+      text-shadow: 0 0 24px rgba(34, 201, 132, 0.36);
+      transform: translateY(-2px);
+    }
+
+    .price.flash-down {
+      color: var(--red);
+      text-shadow: 0 0 24px rgba(240, 93, 94, 0.32);
+      transform: translateY(2px);
+    }
+
+    .direction-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 28px;
+      padding: 0 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 13px;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .direction-pill.up {
+      color: var(--green);
+      border-color: rgba(34, 201, 132, 0.38);
+      background: rgba(34, 201, 132, 0.08);
+    }
+
+    .direction-pill.down {
+      color: var(--red);
+      border-color: rgba(240, 93, 94, 0.36);
+      background: rgba(240, 93, 94, 0.08);
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(90px, 1fr));
+      gap: 10px;
+      min-width: 0;
+      width: 100%;
+    }
+
+    .metric {
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.025);
+      min-width: 0;
+    }
+
+    .metric-value {
+      margin-top: 7px;
+      font-size: 19px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .chart-wrap {
+      position: relative;
+      min-height: 320px;
+      background:
+        linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        var(--panel-2);
+      background-size: 100% 25%, 12.5% 100%;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .chart-caption {
+      position: absolute;
+      left: 14px;
+      top: 12px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 12px;
+      pointer-events: none;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 18px rgba(73, 199, 217, 0.8);
+    }
+
+    .flow-strip {
+      display: grid;
+      grid-template-columns: 1fr 1.85fr 1fr;
+      gap: 1px;
+      border-top: 1px solid var(--line);
+      background: #0f1311;
+    }
+
+    .flow-cell {
+      min-width: 0;
+      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.018);
+    }
+
+    .flow-label {
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      white-space: nowrap;
+    }
+
+    .flow-value {
+      margin-top: 5px;
+      color: var(--text);
+      font-size: 15px;
+      font-weight: 750;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: color 180ms ease, text-shadow 180ms ease;
+    }
+
+    .flow-value.flash-buy {
+      color: var(--green);
+      text-shadow: 0 0 16px rgba(34, 201, 132, 0.35);
+    }
+
+    .flow-value.flash-sell {
+      color: var(--red);
+      text-shadow: 0 0 16px rgba(240, 93, 94, 0.32);
+    }
+
+    .pressure-track {
+      position: relative;
+      height: 4px;
+      margin-top: 8px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(240, 93, 94, 0.26);
+    }
+
+    .pressure-bar {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 50%;
+      border-radius: inherit;
+      background: var(--green);
+      transition: width 360ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .feed-panel {
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      min-height: 0;
+    }
+
+    .feed-header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: center;
+      padding: 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .status-light {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--amber);
+      box-shadow: 0 0 18px rgba(241, 184, 75, 0.55);
+    }
+
+    .status.live .status-light {
+      background: var(--green);
+      box-shadow: 0 0 18px rgba(34, 201, 132, 0.72);
+    }
+
+    .status.error .status-light {
+      background: var(--red);
+      box-shadow: 0 0 18px rgba(240, 93, 94, 0.72);
+    }
+
+    .trade-list {
+      position: relative;
+      overflow: hidden;
+      min-height: 0;
+      background: #0f1211;
+    }
+
+    .trade-list::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto;
+      height: 44px;
+      z-index: 2;
+      background: linear-gradient(180deg, #0f1211, transparent);
+      pointer-events: none;
+    }
+
+    .trade-row {
+      position: relative;
+      display: grid;
+      grid-template-columns: 98px minmax(120px, 1fr) minmax(88px, 0.75fr) 82px;
+      gap: 12px;
+      align-items: center;
+      min-height: 54px;
+      padding: 9px 14px 9px 18px;
+      border-bottom: 1px solid rgba(39, 48, 44, 0.72);
+      font-variant-numeric: tabular-nums;
+      will-change: transform, opacity;
+      transform-origin: top center;
+      overflow: hidden;
+    }
+
+    .trade-row::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      background: var(--green);
+      opacity: 0.9;
+    }
+
+    .trade-row.sell::before {
+      background: var(--red);
+    }
+
+    .trade-row.enter {
+      animation: row-enter 620ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+    }
+
+    .trade-row.exit {
+      animation: row-exit 220ms ease both;
+    }
+
+    @keyframes row-enter {
+      0% {
+        opacity: 0;
+        transform: translateY(-34px) scaleY(0.72);
+        background: rgba(73, 199, 217, 0.16);
+      }
+      50% {
+        opacity: 1;
+        transform: translateY(4px) scaleY(1.02);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scaleY(1);
+        background: transparent;
+      }
+    }
+
+    @keyframes row-exit {
+      to {
+        opacity: 0;
+        transform: translateY(20px) scaleY(0.82);
+      }
+    }
+
+    .trade-time {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .trade-price {
+      font-size: 20px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .trade-row.buy .trade-price,
+    .trade-side.buy {
+      color: var(--green);
+    }
+
+    .trade-row.sell .trade-price,
+    .trade-side.sell {
+      color: var(--red);
+    }
+
+    .trade-qty,
+    .trade-notional {
+      color: var(--muted);
+      font-size: 13px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .trade-side {
+      justify-self: end;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .sweep {
+      position: absolute;
+      inset: 0;
+      transform: translateX(-110%);
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+      animation: sweep 700ms ease-out both;
+      pointer-events: none;
+    }
+
+    @keyframes sweep {
+      to {
+        transform: translateX(110%);
+      }
+    }
+
+    .empty-state {
+      height: 100%;
+      min-height: 360px;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      padding: 28px;
+      text-align: center;
+      line-height: 1.6;
+    }
+
+    .empty-state[hidden] {
+      display: none !important;
+    }
+
+    @media (max-width: 1060px) {
+      .layout {
+        grid-template-columns: 1fr;
+        height: auto;
+        max-height: none;
+      }
+
+      .market-panel {
+        min-height: 560px;
+      }
+
+      .feed-panel {
+        height: 560px;
+      }
+
+      .headline {
+        grid-template-columns: 1fr;
+      }
+
+      .stats {
+        min-width: 0;
+      }
+
+      .metric {
+        border: 1px solid var(--line);
+      }
+    }
+
+    @media (max-width: 700px) {
+      .shell {
+        width: min(100vw - 20px, 1500px);
+        padding-top: 12px;
+      }
+
+      .topbar {
+        grid-template-columns: 1fr;
+      }
+
+      .controls {
+        justify-content: flex-start;
+      }
+
+      .coin {
+        width: 40px;
+        height: 40px;
+        font-size: 22px;
+      }
+
+      .stats {
+        grid-template-columns: 1fr;
+      }
+
+      .metric-value {
+        font-size: 20px;
+      }
+
+      .flow-strip {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .feed-header {
+        grid-template-columns: 1fr;
+      }
+
+      .layout {
+        min-height: 0;
+      }
+
+      .market-panel {
+        min-height: 520px;
+      }
+
+      .feed-panel {
+        height: 520px;
+      }
+
+      .trade-row {
+        grid-template-columns: 74px minmax(110px, 1fr) 60px;
+        gap: 9px;
+        padding-right: 10px;
+      }
+
+      .trade-qty {
+        display: none;
+      }
+
+      .trade-notional {
+        font-size: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="coin" aria-hidden="true">₿</div>
+        <div>
+          <h1>BTC 实时成交流</h1>
+          <div class="subtitle">BTC spot trades, live from the market.</div>
+        </div>
+      </div>
+      <div class="controls" aria-label="数据源控制">
+        <select id="symbolSelect" class="control" aria-label="交易对">
+          <option value="btcusdt">BTC/USDT</option>
+          <option value="btcusdc">BTC/USDC</option>
+        </select>
+        <button id="pauseButton" class="icon-button" type="button" title="暂停或继续" aria-label="暂停或继续">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="6" y="4" width="4" height="16"></rect>
+            <rect x="14" y="4" width="4" height="16"></rect>
+          </svg>
+        </button>
+        <button id="resetButton" class="icon-button" type="button" title="清空视图" aria-label="清空视图">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 6h18"></path>
+            <path d="M8 6V4h8v2"></path>
+            <path d="M19 6l-1 14H6L5 6"></path>
+            <path d="M10 11v5"></path>
+            <path d="M14 11v5"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <section class="layout" aria-label="比特币实时交易面板">
+      <section class="market-panel" aria-label="市场概览">
+        <div class="headline">
+          <div>
+            <div class="price-label">Last trade price</div>
+            <div class="price-row">
+              <div id="lastPrice" class="price">$--</div>
+              <div id="priceMove" class="direction-pill">等待成交</div>
+            </div>
+          </div>
+          <div class="stats" aria-label="实时统计">
+            <div class="metric">
+              <div class="metric-label">Trades</div>
+              <div id="tradeCount" class="metric-value">0</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">1m Volume</div>
+              <div id="minuteVolume" class="metric-value">-- BTC</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Avg Size</div>
+              <div id="avgSize" class="metric-value">-- BTC</div>
+            </div>
+          </div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="tradeCanvas" aria-label="成交价格图表"></canvas>
+          <div class="chart-caption"><span class="dot"></span><span>实时价位轨迹与成交量脉冲</span></div>
+        </div>
+        <div class="flow-strip" aria-label="实时资金流">
+          <div class="flow-cell">
+            <div class="flow-label">Buy pressure</div>
+            <div id="buyPressure" class="flow-value">--</div>
+            <div class="pressure-track"><span id="buyPressureBar" class="pressure-bar"></span></div>
+          </div>
+          <div class="flow-cell">
+            <div class="flow-label">1m Range</div>
+            <div id="rangeValue" class="flow-value">--</div>
+          </div>
+          <div class="flow-cell">
+            <div class="flow-label">Largest</div>
+            <div id="largestTrade" class="flow-value">--</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="feed-panel" aria-label="逐笔成交列表">
+        <div class="feed-header">
+          <div>
+            <div class="panel-label">Latest trades</div>
+          </div>
+          <div id="connectionStatus" class="status">
+            <span class="status-light"></span>
+            <span id="statusText">连接中</span>
+          </div>
+        </div>
+        <div id="tradeList" class="trade-list">
+          <div id="emptyState" class="empty-state">正在连接实时交易流...</div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    const streamBase = "wss://stream.binance.com:9443/ws/";
+    const maxRows = 42;
+    const els = {
+      lastPrice: document.querySelector("#lastPrice"),
+      priceMove: document.querySelector("#priceMove"),
+      tradeCount: document.querySelector("#tradeCount"),
+      minuteVolume: document.querySelector("#minuteVolume"),
+      avgSize: document.querySelector("#avgSize"),
+      status: document.querySelector("#connectionStatus"),
+      statusText: document.querySelector("#statusText"),
+      list: document.querySelector("#tradeList"),
+      empty: document.querySelector("#emptyState"),
+      buyPressure: document.querySelector("#buyPressure"),
+      buyPressureBar: document.querySelector("#buyPressureBar"),
+      rangeValue: document.querySelector("#rangeValue"),
+      largestTrade: document.querySelector("#largestTrade"),
+      symbol: document.querySelector("#symbolSelect"),
+      pause: document.querySelector("#pauseButton"),
+      reset: document.querySelector("#resetButton"),
+      canvas: document.querySelector("#tradeCanvas")
+    };
+
+    const state = {
+      socket: null,
+      reconnectTimer: null,
+      queueFrame: null,
+      queue: [],
+      rows: [],
+      recent: [],
+      chartTrades: [],
+      lastPrice: null,
+      count: 0,
+      paused: false,
+      connected: false,
+      symbol: els.symbol.value,
+      retryDelay: 900,
+      lastRenderAt: 0
+    };
+
+    const ctx = els.canvas.getContext("2d");
+    const priceFormatter = new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+    const compactFormatter = new Intl.NumberFormat("en-US", {
+      maximumFractionDigits: 4
+    });
+    const timeFormatter = new Intl.DateTimeFormat("zh-CN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false
+    });
+
+    function connect() {
+      clearTimeout(state.reconnectTimer);
+      if (state.socket) {
+        state.socket.onclose = null;
+        state.socket.close();
+      }
+
+      setStatus("连接中", "pending");
+      state.connected = false;
+      const stream = `${state.symbol}@trade`;
+      const socket = new WebSocket(`${streamBase}${stream}`);
+      state.socket = socket;
+
+      socket.addEventListener("open", () => {
+        state.connected = true;
+        state.retryDelay = 900;
+        setStatus("实时连接", "live");
+      });
+
+      socket.addEventListener("message", (event) => {
+        if (state.paused) return;
+        const data = JSON.parse(event.data);
+        const price = Number(data.p);
+        const qty = Number(data.q);
+        const side = data.m ? "sell" : "buy";
+        const trade = {
+          id: data.t,
+          price,
+          qty,
+          side,
+          time: data.T || Date.now(),
+          notional: price * qty
+        };
+        state.queue.push(trade);
+      });
+
+      socket.addEventListener("error", () => {
+        setStatus("连接异常", "error");
+      });
+
+      socket.addEventListener("close", () => {
+        if (state.socket !== socket) return;
+        state.connected = false;
+        setStatus("重连中", "pending");
+        state.reconnectTimer = setTimeout(connect, state.retryDelay);
+        state.retryDelay = Math.min(state.retryDelay * 1.7, 8000);
+      });
+    }
+
+    function setStatus(text, mode) {
+      els.statusText.textContent = text;
+      els.status.className = `status ${mode === "live" ? "live" : mode === "error" ? "error" : ""}`;
+    }
+
+    function processQueue() {
+      if (!state.paused && state.queue.length) {
+        addTrade(state.queue.shift());
+        if (state.queue.length > 30 && state.connected) {
+          setStatus(`播放中 +${state.queue.length}`, "live");
+        } else if (state.connected) {
+          setStatus("实时连接", "live");
+        }
+      }
+      state.queueFrame = requestAnimationFrame(processQueue);
+    }
+
+    function addTrade(trade) {
+      const oldPrice = state.lastPrice;
+      state.lastPrice = trade.price;
+      state.count += 1;
+
+      state.recent.push(trade);
+      const cutoff = Date.now() - 60_000;
+      state.recent = state.recent.filter((item) => item.time >= cutoff);
+      state.chartTrades.push({ ...trade, born: performance.now() });
+      state.chartTrades = state.chartTrades.slice(-180);
+
+      updateHeadline(trade, oldPrice);
+      addTradeRow(trade);
+      updateFlowStrip(trade);
+    }
+
+    function updateHeadline(trade, oldPrice) {
+      els.lastPrice.textContent = priceFormatter.format(trade.price);
+      els.lastPrice.classList.remove("flash-up", "flash-down");
+      void els.lastPrice.offsetWidth;
+
+      if (oldPrice !== null) {
+        const delta = trade.price - oldPrice;
+        const direction = delta >= 0 ? "up" : "down";
+        els.lastPrice.classList.add(direction === "up" ? "flash-up" : "flash-down");
+        els.priceMove.className = `direction-pill ${direction}`;
+        els.priceMove.textContent = `${direction === "up" ? "▲" : "▼"} ${priceFormatter.format(Math.abs(delta))}`;
+      } else {
+        els.priceMove.className = `direction-pill ${trade.side === "buy" ? "up" : "down"}`;
+        els.priceMove.textContent = trade.side === "buy" ? "▲ buy flow" : "▼ sell flow";
+      }
+
+      els.tradeCount.textContent = state.count.toLocaleString("en-US");
+      const volume = state.recent.reduce((sum, item) => sum + item.qty, 0);
+      const avg = state.recent.length ? volume / state.recent.length : 0;
+      els.minuteVolume.textContent = `${compactFormatter.format(volume)} BTC`;
+      els.avgSize.textContent = `${compactFormatter.format(avg)} BTC`;
+    }
+
+    function addTradeRow(trade) {
+      els.empty.hidden = true;
+      const row = document.createElement("div");
+      row.className = `trade-row ${trade.side} enter`;
+      row.dataset.tradeId = trade.id;
+
+      const time = document.createElement("div");
+      time.className = "trade-time";
+      time.textContent = timeFormatter.format(new Date(trade.time));
+
+      const price = document.createElement("div");
+      price.className = "trade-price";
+      price.textContent = priceFormatter.format(trade.price);
+
+      const qty = document.createElement("div");
+      qty.className = "trade-qty";
+      qty.textContent = `${compactFormatter.format(trade.qty)} BTC`;
+
+      const side = document.createElement("div");
+      side.className = `trade-side ${trade.side}`;
+      side.textContent = trade.side === "buy" ? "BUY" : "SELL";
+
+      const sweep = document.createElement("span");
+      sweep.className = "sweep";
+
+      row.append(time, price, qty, side, sweep);
+      els.list.insertBefore(row, state.rows[0] || els.empty);
+      state.rows.unshift(row);
+
+      row.addEventListener("animationend", () => row.classList.remove("enter"), { once: true });
+
+      while (state.rows.length > maxRows) {
+        const old = state.rows.pop();
+        old.classList.add("exit");
+        old.addEventListener("animationend", () => old.remove(), { once: true });
+      }
+    }
+
+    function updateFlowStrip(trade) {
+      const now = Date.now();
+      const tenSecondTrades = state.recent.filter((item) => item.time >= now - 10_000);
+      const buyVolume = tenSecondTrades
+        .filter((item) => item.side === "buy")
+        .reduce((sum, item) => sum + item.qty, 0);
+      const sellVolume = tenSecondTrades
+        .filter((item) => item.side === "sell")
+        .reduce((sum, item) => sum + item.qty, 0);
+      const totalVolume = buyVolume + sellVolume;
+      const buyShare = totalVolume ? Math.round((buyVolume / totalVolume) * 100) : 50;
+      const prices = state.recent.map((item) => item.price);
+      const high = prices.length ? Math.max(...prices) : trade.price;
+      const low = prices.length ? Math.min(...prices) : trade.price;
+      const largest = state.recent.reduce((best, item) => item.notional > best.notional ? item : best, trade);
+
+      els.buyPressureBar.style.width = `${buyShare}%`;
+      setFlowValue(els.buyPressure, `${buyShare}% buy`, trade.side);
+      setFlowValue(els.rangeValue, `${priceFormatter.format(low)}-${priceFormatter.format(high)}`, trade.side);
+      setFlowValue(els.largestTrade, `${compactFormatter.format(largest.qty)} BTC`, largest.side);
+    }
+
+    function setFlowValue(element, text, side) {
+      if (element.textContent === text) return;
+      element.textContent = text;
+      element.classList.remove("flash-buy", "flash-sell");
+      void element.offsetWidth;
+      element.classList.add(side === "buy" ? "flash-buy" : "flash-sell");
+      window.setTimeout(() => element.classList.remove("flash-buy", "flash-sell"), 220);
+    }
+
+    function resizeCanvas() {
+      const rect = els.canvas.getBoundingClientRect();
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      const width = Math.max(1, Math.floor(rect.width * dpr));
+      const height = Math.max(1, Math.floor(rect.height * dpr));
+      if (els.canvas.width !== width || els.canvas.height !== height) {
+        els.canvas.width = width;
+        els.canvas.height = height;
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    function draw(now) {
+      resizeCanvas();
+      const width = els.canvas.clientWidth;
+      const height = els.canvas.clientHeight;
+      ctx.clearRect(0, 0, width, height);
+
+      const trades = state.chartTrades;
+      if (trades.length >= 2) {
+        const prices = trades.map((item) => item.price);
+        const min = Math.min(...prices);
+        const max = Math.max(...prices);
+        const spread = Math.max(max - min, 1);
+
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "rgba(73, 199, 217, 0.76)";
+        ctx.beginPath();
+        trades.forEach((trade, index) => {
+          const x = (index / Math.max(trades.length - 1, 1)) * width;
+          const y = height - 34 - ((trade.price - min) / spread) * (height - 76);
+          if (index === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+
+        trades.forEach((trade, index) => {
+          const age = now - trade.born;
+          const freshness = Math.max(0, 1 - age / 2200);
+          const x = (index / Math.max(trades.length - 1, 1)) * width;
+          const y = height - 34 - ((trade.price - min) / spread) * (height - 76);
+          const radius = 2.5 + Math.min(trade.qty * 2400, 10) + freshness * 7;
+          ctx.beginPath();
+          ctx.fillStyle = trade.side === "buy"
+            ? `rgba(34, 201, 132, ${0.20 + freshness * 0.55})`
+            : `rgba(240, 93, 94, ${0.20 + freshness * 0.55})`;
+          ctx.arc(x, y, radius, 0, Math.PI * 2);
+          ctx.fill();
+
+          if (freshness > 0.01) {
+            ctx.beginPath();
+            ctx.strokeStyle = trade.side === "buy"
+              ? `rgba(34, 201, 132, ${freshness * 0.56})`
+              : `rgba(240, 93, 94, ${freshness * 0.56})`;
+            ctx.lineWidth = 1;
+            ctx.arc(x, y, radius + freshness * 18, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+        });
+
+        ctx.fillStyle = "rgba(238, 245, 239, 0.68)";
+        ctx.font = "12px ui-sans-serif, system-ui";
+        ctx.fillText(priceFormatter.format(max), width - 108, 28);
+        ctx.fillText(priceFormatter.format(min), width - 108, height - 18);
+      } else {
+        ctx.fillStyle = "rgba(150, 163, 155, 0.66)";
+        ctx.font = "14px ui-sans-serif, system-ui";
+        ctx.fillText("暂无成交", 18, height - 22);
+      }
+
+      requestAnimationFrame(draw);
+    }
+
+    function resetView() {
+      state.queue = [];
+      state.rows.forEach((row) => row.remove());
+      state.rows = [];
+      state.recent = [];
+      state.chartTrades = [];
+      state.lastPrice = null;
+      state.count = 0;
+      els.lastPrice.textContent = "$--";
+      els.priceMove.className = "direction-pill";
+      els.priceMove.textContent = "等待成交";
+      els.tradeCount.textContent = "0";
+      els.minuteVolume.textContent = "-- BTC";
+      els.avgSize.textContent = "-- BTC";
+      els.buyPressure.textContent = "--";
+      els.buyPressureBar.style.width = "50%";
+      els.rangeValue.textContent = "--";
+      els.largestTrade.textContent = "--";
+      els.empty.hidden = false;
+    }
+
+    els.pause.addEventListener("click", () => {
+      state.paused = !state.paused;
+      els.pause.innerHTML = state.paused
+        ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>'
+        : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>';
+      els.pause.setAttribute("aria-label", state.paused ? "继续" : "暂停");
+      els.pause.setAttribute("title", state.paused ? "继续" : "暂停");
+      setStatus(state.paused ? "已暂停" : state.connected ? "实时连接" : "连接中", state.paused ? "pending" : state.connected ? "live" : "pending");
+    });
+
+    els.reset.addEventListener("click", resetView);
+
+    els.symbol.addEventListener("change", () => {
+      state.symbol = els.symbol.value;
+      resetView();
+      connect();
+    });
+
+    window.addEventListener("resize", resizeCanvas);
+
+    connect();
+    processQueue();
+    requestAnimationFrame(draw);
+  </script>
+</body>
+</html>
